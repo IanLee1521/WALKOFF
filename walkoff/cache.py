@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import timedelta
 from functools import partial
 from weakref import WeakSet
+import re
 
 import os.path
 from diskcache import FanoutCache, DEFAULT_SETTINGS, Cache
@@ -233,6 +234,13 @@ class DiskCacheAdapter(object):
         retry (bool, optional): Should this database retry timed out transactions? Default to True
         **settings: Other setting which will be passsed to the `cache` attribute on initialization
     """
+    instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls.instance is None:
+            cls.instance = super(DiskCacheAdapter, cls).__new__(cls)
+            logger.info('Created disk cache connection')
+        return cls.instance
 
     def __init__(self, directory, shards=8, timeout=0.01, retry=True, **settings):
         self.directory = directory
@@ -285,6 +293,11 @@ class DiskCacheAdapter(object):
         if expire is not None:
             expire = self._convert_expire_to_seconds(expire)
         return self.cache.add(key, value, expire=expire, retry=opts.get('retry', self.retry), **opts)
+
+    def delete(self, key):
+        """Deletes a key
+        """
+        return self.cache.delete(key, retry=self.retry)
 
     def incr(self, key, amount=1, retry=None):
         """Increments a key by an amount.
@@ -423,6 +436,22 @@ class DiskCacheAdapter(object):
         """
         self.pubsub_cache.register_callbacks()
 
+    def scan(self, pattern=None):
+        """Scans through all keys in the cache
+
+        Args:
+            pattern (str, optional): Regex Pattern to search for
+
+        Returns:
+            Iterator(str): The keys in the cache matching the pattern if specified. Else all the keys in the cache
+        """
+        if not pattern:
+            pattern = '(.*)'
+        else:
+            pattern = pattern.replace('*', '(.*)')
+        pattern = re.compile(pattern)
+        return (key for key in self.cache if pattern.search(key))
+
     @staticmethod
     def _convert_expire_to_seconds(time):
         """Converts values passed as expire time to a float seconds
@@ -499,6 +528,13 @@ class RedisSubscription(object):
 
 class RedisCacheAdapter(object):
     _requires = ['redis']
+    instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls.instance is None:
+            cls.instance = super(RedisCacheAdapter, cls).__new__(cls)
+            logger.info('Created redis cache connection')
+        return cls.instance
 
     def __init__(self, **opts):
         from redis import StrictRedis
@@ -524,7 +560,7 @@ class RedisCacheAdapter(object):
 
         Args:
             key: The key to get the value from
-            **opts: Additional options to use. See `FanoutCache` for more details.
+            **opts: Additional options to use.
 
         Returns:
             The value stored in the key
@@ -545,6 +581,11 @@ class RedisCacheAdapter(object):
             (bool): Was the key set?
         """
         return self.cache.set(key, value, px=expire, nx=True, **opts)
+
+    def delete(self, key):
+        """Deletes a key
+        """
+        return self.cache.delete(key)
 
     def incr(self, key, amount=1):
         """Increments a key by an amount.
@@ -698,6 +739,17 @@ class RedisCacheAdapter(object):
         """
         pass
 
+    def scan(self, pattern=None):
+        """Scans through all keys in the cache
+
+        Args:
+            pattern (str, optional): Regex Pattern to search for
+
+        Returns:
+            Iterator(str): The keys in the cache matching the pattern if specified. Else all the keys in the cache
+        """
+        return self.cache.scan_iter(pattern)
+
     @classmethod
     def from_json(cls, json_in):
         """Constructs this cache from its JSON representation
@@ -745,6 +797,4 @@ def make_cache(config=None):
             'Cache type requires the following packages {1}. '
             'Using default DiskCache'.format(cache_type, getattr(cache_translation[cache_type], '_requires', [])))
         cache = DiskCacheAdapter.from_json(config)
-
-    logger.info('Created {} cache connection'.format(cache_type))
     return cache
