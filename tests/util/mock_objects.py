@@ -177,7 +177,7 @@ class MockRequestQueue(object):
 class MockRedisCacheAdapter(RedisCacheAdapter):
     def __init__(self, **opts):
         self.cache = FakeStrictRedis(**opts)
-
+        self.cache.info = lambda : None
     def info(self):
         pass
 
