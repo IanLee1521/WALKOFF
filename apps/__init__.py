@@ -82,8 +82,17 @@ class App(object):
         key_pattern = self._get_field_pattern(context=new_context)
         for key in self._cache.scan(key_pattern):
             value = dill.loads(self._cache.get(key))
-            field = key.split('.')[-1]
+            field = key.split(self.__cache_separator)[-1]
             self.__dict__[field] = value
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop('_cache', None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.__dict__['_cache'] = make_cache(walkoff.config.Config.CACHE)
 
     def _clear_cache(self):
         for key in self._cache.scan(self._get_field_pattern()):

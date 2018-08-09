@@ -748,7 +748,7 @@ class RedisCacheAdapter(object):
         Returns:
             Iterator(str): The keys in the cache matching the pattern if specified. Else all the keys in the cache
         """
-        return self.cache.scan_iter(pattern)
+        return (key.decode('utf-8') for key in self.cache.scan_iter(pattern))
 
     @classmethod
     def from_json(cls, json_in):

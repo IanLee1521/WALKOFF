@@ -178,6 +178,9 @@ class MockRedisCacheAdapter(RedisCacheAdapter):
     def __init__(self, **opts):
         self.cache = FakeStrictRedis(**opts)
 
+    def info(self):
+        pass
+
 
 class PubSubCacheSpy(object):
     def __init__(self):
