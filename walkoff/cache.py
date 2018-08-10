@@ -2,6 +2,7 @@ import logging
 import os
 import pickle
 import sqlite3
+import warnings
 import threading
 from copy import deepcopy
 from datetime import timedelta
@@ -105,6 +106,8 @@ class DiskPubSubCache(object):
     _update_func_name = 'push_on_update'
 
     def __init__(self, directory, timeout=0.01):
+        warnings.warn('DiskCache is deprecated and will be removed in the 0.10.0 release. '
+                      'Use a Redis cache instead.', DeprecationWarning)
         self.cache = Cache(directory, timeout=timeout)
         self._subscribers = {}  # Would be nice to use a weakref to a set so that keys with no subscribers are
         self._threads_registered = set()
